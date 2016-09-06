@@ -306,7 +306,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 147 (last added: recurrent_param)
+// LayerParameter next available layer-specific ID: 148 (last added: heatmap_data_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -376,6 +376,7 @@ message LayerParameter {
   optional FlattenParameter flatten_param = 135;
   optional HDF5DataParameter hdf5_data_param = 112;
   optional HDF5OutputParameter hdf5_output_param = 113;
+  optional HeatmapDataParameter heatmap_data_param = 147;
   optional HingeLossParameter hinge_loss_param = 114;
   optional ImageDataParameter image_data_param = 115;
   optional InfogainLossParameter infogain_loss_param = 116;
@@ -756,6 +757,25 @@ message HDF5DataParameter {
 
 message HDF5OutputParameter {
   optional string file_name = 1;
+}
+
+// Message that stores parameters used by HeatmapDataLayer
+message HeatmapDataParameter {
+  // Number of channels in the input blob
+  optional uint32 num_channels = 1000 [ default = 3 ];
+  // Batch size
+  optional uint32 batch_size = 1001;
+  // Root directory relative to which paths are specified in the input file
+  optional string root_img_dir = 1002;
+  // Input file containing training metadata and labels
+  optional string source = 1003;
+  // Mean file (binaryproto)
+  optional string mean_file = 1004;
+  // Size of the output image of the HeatmapDataLayer (assumed to be square)
+  optional uint32 data_output_size = 1005;
+  // Length and height of the label (ground-truth keypoint location)
+  optional uint32 label_width = 1006 [ default = 1 ];
+  optional uint32 label_height = 1007 [ default = 1 ];
 }
 
 message HingeLossParameter {
