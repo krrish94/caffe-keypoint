@@ -306,7 +306,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 148 (last added: heatmap_data_param)
+// LayerParameter next available layer-specific ID: 149 (last added: heatmap_loss_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -377,6 +377,7 @@ message LayerParameter {
   optional HDF5DataParameter hdf5_data_param = 112;
   optional HDF5OutputParameter hdf5_output_param = 113;
   optional HeatmapDataParameter heatmap_data_param = 147;
+  optional HeatmapLossParameter heatmap_loss_param = 148;
   optional HingeLossParameter hinge_loss_param = 114;
   optional ImageDataParameter image_data_param = 115;
   optional InfogainLossParameter infogain_loss_param = 116;
@@ -778,6 +779,14 @@ message HeatmapDataParameter {
   optional bool visualize = 1007 [ default = false ];
   // 'Spread' of the Gaussian around the ground-truth keypoint
   optional float label_sigma = 1008 [ default = 1.5 ];
+}
+
+// Message that stores parameters used by HeatmapLossLayer
+message HeatmapLossParameter {
+  // Whether or not to visualize output images
+  optional bool visualize = 1000 [ default = false ];
+  // Index of the channel to visualize
+  optional uint32 visualize_channel = 1001 [ default = 0 ];
 }
 
 message HingeLossParameter {

@@ -86,24 +86,21 @@ protected:
     // Size of the blob (num_channels * height * width)
     int datum_size_;
 
-    // Number of means
-    int num_means_;
+    // Whether or not the mean file is provided
+    bool has_mean_file_;
     // Holds mean image
-    vector<cv::Mat> mean_img_;
-    // Whether or not the mean is to be subtracted
-    bool sub_mean_;
+    cv::Mat mean_img_;
     // Base directory containing the images
     string root_img_dir_;
     // Index of the current image
     int cur_img_;
-    // Current image for each class
-    vector<int> img_idx_map_;
 
     // Array of lists: one list of image names per class
     vector< vector< pair<string, pair<vector<float>, pair<vector<float>, int> > > > > img_list_;
 
     // Vector of (image, label) pairs
     vector< pair<string, vector<float> > > img_label_list_;
+
 };
 
 }

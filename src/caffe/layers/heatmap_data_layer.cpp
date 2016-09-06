@@ -86,92 +86,44 @@ void HeatmapDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
 
     }
 
+    // Number of channels (assumed 3 by default)
+    this->datum_channels_ = 3;
+
     // Initialize image counter to 0
     cur_img_ = 0;
 
-    // // Mean image subtraction (yet to be implemented)
 
-    // // If mean file is not present, you do not need to subtract it
-    // if(!heatmap_data_param.has_mean_file()){
-    // 	// Assume input images are RGB
-    // 	this->datum_channels_ = 3;
-    // 	sub_mean_ = false;
-    // }
+    // TODO: Implement mean value subtraction as well
+    // Whether or not the mean file is provided in transform_param
+    has_mean_file_ = this->transform_param_.has_mean_file();
 
+    // If mean file is present, load it
+    if(has_mean_file_){
+    	
+    	const string& mean_file = this->transform_param_.mean_file();
+    	LOG(INFO) << "Loading mean file from " << mean_file;
+    	BlobProto blob_proto;
+    	ReadProtoFromBinaryFileOrDie(mean_file.c_str(), &blob_proto);
+    	Blob<Dtype> data_mean;
+    	data_mean.FromProto(blob_proto);
+    	LOG(INFO) << "Mean file loaded";
 
+    	// Read config (number of channels in the mean image)
+    	this->datum_channels_ = data_mean.channels();
 
-    // // Mean image subtraction
-    // if (!heatmap_data_param.has_meanfile())
-    // {
-    //     // If image mean isn't specified, assume input images are RGB (3 channels)
-    //     this->datum_channels_ = 3;
-    //     // Mean subtraction is not to be performed
-    //     sub_mean_ = false;
-    // } else {
-        
-    //     // Implementation of per-video mean removal
+    	// Save mean as OpenCV compatible Mat struct
+    	const Dtype* mean_buf = data_mean.cpu_data();
+    	mean_img_.create(data_mean.height(), data_mean.width(), CV_32FC3);
+    	for(int i = 0; i < data_mean.height(); ++i){
+    		for(int j = 0; j < data_mean.width(); ++j){
+    			for(int c = 0; c < this->datum_channels_; ++c){
+    				mean_img_.at<cv::Vec3f>(i,j)[c] = mean_buf[2 + ((this->datum_channels_+c)*data_mean.height()+i)*data_mean.width()+j];
+    			}
+    		}
+    	}
+    	LOG(INFO) << "Mean file converted to OpenCV Mat struct";
 
-    //     // Get path of mean file
-    //     sub_mean_ = true;
-    //     string mean_path = heatmap_data_param.meanfile();
-
-    //     LOG(INFO) << "Loading mean file from " << mean_path;
-    //     BlobProto blob_proto, blob_proto2;
-    //     Blob<Dtype> data_mean;
-    //     ReadProtoFromBinaryFile(mean_path.c_str(), &blob_proto);
-    //     data_mean.FromProto(blob_proto);
-    //     LOG(INFO) << "mean file loaded";
-
-    //     // Read config (number of channels in the mean image)
-    //     this->datum_channels_ = data_mean.channels();
-    //     // Number of means (one mean is assumed per video)
-    //     num_means_ = data_mean.num();
-    //     LOG(INFO) << "num_means: " << num_means_;
-
-    //     // Copy the per-video mean images to an array of OpenCV structures
-    //     const Dtype* mean_buf = data_mean.cpu_data();
-
-    //     // Extract means from beginning of proto file
-    //     const int mean_height = data_mean.height();
-    //     const int mean_width = data_mean.width();
-    //     int mean_heights[num_means_];
-    //     int mean_widths[num_means_];
-
-    //     // Offset in memory to mean images
-    //     const int meanOffset = 2 * (num_means_);
-    //     for (int n = 0; n < num_means_; n++)
-    //     {
-    //         mean_heights[n] = mean_buf[2 * n];
-    //         mean_widths[n] = mean_buf[2 * n + 1];
-    //     }
-
-    //     // Save means as OpenCV-compatible files
-    //     for (int n = 0; n < num_means_; n++)
-    //     {
-    //         cv::Mat mean_img_tmp_;
-    //         mean_img_tmp_.create(mean_heights[n], mean_widths[n], CV_32FC3);
-    //         mean_img_.push_back(mean_img_tmp_);
-    //         LOG(INFO) << "per-video mean file array created: " << n << ": " << mean_heights[n] << "x" << mean_widths[n] << " (" << size << ")";
-    //     }
-
-    //     LOG(INFO) << "mean: " << mean_height << "x" << mean_width << " (" << size << ")";
-
-    //     for (int n = 0; n < num_means_; n++)
-    //     {
-    //         for (int i = 0; i < mean_heights[n]; i++)
-    //         {
-    //             for (int j = 0; j < mean_widths[n]; j++)
-    //             {
-    //                 for (int c = 0; c < this->datum_channels_; c++)
-    //                 {
-    //                     mean_img_[n].at<cv::Vec3f>(i, j)[c] = mean_buf[meanOffset + ((n * this->datum_channels_ + c) * mean_height + i) * mean_width + j]; //[c * mean_height * mean_width + i * mean_width + j];
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     LOG(INFO) << "mean file converted to OpenCV structures";
-    // }
+    }
 
 
     // Reshape data to the desired output size (data_output_size is specified in heatmap_params)
@@ -233,13 +185,11 @@ void HeatmapDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
     // Create OpenCV Mat objects for storing various visualizations
     cv::Mat img, img_res, img_mean_vis, img_vis, img_res_vis, mean_img_this;
 
-    // Whether or not to subtract mean image
-    // const bool sub_mean = this->sub_mean_;
-
     
     // If data is to be visualized, create a window
     if (heatmap_data_param.visualize()) {
         cv::namedWindow("input image", cv::WINDOW_AUTOSIZE);
+        cv::namedWindow("mean image", cv::WINDOW_AUTOSIZE);
     }
 
 
@@ -273,6 +223,8 @@ void HeatmapDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
             this->VisualizeAnnotations(img_annotation_vis, cur_label.size()/2, cur_label);
             // Display the image with the keypoints overlaid
             cv::imshow("input image", img_annotation_vis);
+            // Clone the original image again, this time for visualizing the mean subtracted image
+            img_vis = img.clone();
         }
 
         // Convert from BGR (OpenCV) to RGB (Caffe)
@@ -280,30 +232,19 @@ void HeatmapDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
         // Convert image to float-32
         img.convertTo(img, CV_32FC3);
 
-        // // Subtract per-video mean, if used
-        // int meanInd = 0;
-        // if(sub_mean){
+        // Subtract mean image, if mean file is specified
+        if(this->has_mean_file_){
 
-        //     // Subtract mean image (after appropriately resizing it)
-        //     mean_img_this = this->mean_img_.clone();
+        	img -= mean_img_;
 
-        //     DLOG(INFO) << "Image size: " << width << "x" << height;
-        //     DLOG(INFO) << "Mean image size: " << mean_img_this.cols << "x" << mean_img_this.rows;
-           
-        //     cv::resize(mean_img_this, mean_img_this, img.size());
+        	if(heatmap_data_param.visualize()){
+        		// img_vis -= this->mean_img_;
+        		// img_mean_vis = mean_img_.clone();
+        		// cv::cvtColor(img_mean_vis, img_mean_vis, CV_RGB2BGR);
+        		// cv::imshow("mean image", img_mean_vis);
+        	}
 
-        //     img -= mean_img_this;
-
-        //     DLOG(INFO) << "Subtracted mean image.";
-
-        //     if (heatmap_data_param.visualize()){
-        //     	img_vis = img.clone();
-        //         img_vis -= mean_img_this;
-        //         img_mean_vis = mean_img_this.clone() / 255;
-        //         cv::cvtColor(img_mean_vis, img_mean_vis, CV_RGB2BGR);
-        //         cv::imshow("mean image", img_mean_vis);
-        //     }
-        // }
+        }
 
         // Resize input image to output image size
         cv::Size s(heatmap_data_param.data_output_size(), heatmap_data_param.data_output_size());
