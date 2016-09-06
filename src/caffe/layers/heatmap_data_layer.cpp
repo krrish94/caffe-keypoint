@@ -15,8 +15,8 @@
 #include <cmath>
 
 #include "caffe/layer.hpp"
-#include "caffe/data_layers.hpp"
-#include "caffe/layers/heatmap_data.hpp"
+#include "caffe/layers/data_layer.hpp"
+#include "caffe/layers/heatmap_data_layer.hpp"
 #include "caffe/util/io.hpp"
 #include "caffe/util/math_functions.hpp"
 #include "caffe/util/rng.hpp"
@@ -195,7 +195,7 @@ void HeatmapDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     // Number of channels in the label (number of labels per image)
     // Get the size by examining the first label struct stored in img_list_
     // i.e., the second entity in the first pair in img_list_
-    int label_num_channels = img_list_[0][0].second.size() / 2;
+    int label_num_channels = img_label_list_[0].second.size() / 2;
     
     // Reshape the second top blob (corresponding to the label)
     top[1]->Reshape(heatmap_data_param.batch_size(), label_num_channels, 
@@ -233,55 +233,17 @@ void HeatmapDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
     // Create OpenCV Mat objects for storing various visualizations
     cv::Mat img, img_res, img_mean_vis, img_vis, img_res_vis, mean_img_this;
 
-    // Shortcuts to params
-
-    // Whether or not to visualize data
-    const bool visualise = this->layer_param_.visualise();
-    // (???)
-    const Dtype scale = heatmap_data_param.scale();
-    // Data batch size
-    const int batchsize = heatmap_data_param.batchsize();
-    // Height and width of each label
-    const int label_height = heatmap_data_param.label_height();
-    const int label_width = heatmap_data_param.label_width();
-    // Maximum angle by which random rotations are allowed
-    const float angle_max = heatmap_data_param.angle_max();
-    // Flag that specifies not to flip image first
-    const bool dont_flip_first = heatmap_data_param.dont_flip_first();
-    // Flag to specify whether or not to flip joint labels
-    const bool flip_joint_labels = heatmap_data_param.flip_joint_labels();
-    // Factor by which labels have to be multiplied
-    const int multfact = heatmap_data_param.multfact();
-    // (???)
-    const bool segmentation = heatmap_data_param.segmentation();
-    // Crop size (for randomly generated crops)
-    const int size = heatmap_data_param.cropsize();
-    // Output size of heatmap data blob
-    const int outsize = heatmap_data_param.outsize();
-    // Number of augmentations (This is initially set to 1, for the actual image. As augmentations 
-    // are made (cropping, jittering, etc.), this is incremented)
-    const int num_aug = 1;
-    // Resize factor (to resize the random crops to the required output (data) blob size)
-    const float resizeFact = (float)outsize / (float)size;
-    // Set random crops to false
-    const bool random_crop = heatmap_data_param.random_crop();
-
-    
-    // Shortcuts to global vars
-
     // Whether or not to subtract mean image
-    const bool sub_mean = this->sub_mean_;
-    // Number of channels in the blob
-    const int channels = this->datum_channels_;
+    // const bool sub_mean = this->sub_mean_;
 
     
     // If data is to be visualized, create a window
-    if (visualise) {
+    if (heatmap_data_param.visualize()) {
         cv::namedWindow("input image", cv::WINDOW_AUTOSIZE);
     }
 
 
-    // Collect "batchsize" images
+    // Collect "batch_size" images
 
     // Label for the current instance
     std::vector<float> cur_label;
@@ -298,29 +260,20 @@ void HeatmapDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
         int label_num_channels = cur_label.size() / 2;
 
         // Read in the current image
-        std::string img_path = this->heatmap_data_param.root_img_dir() + img_name;
+        std::string img_path = heatmap_data_param.root_img_dir() + img_name;
         DLOG(INFO) << "img: " << img_path;
         img = cv::imread(img_path, CV_LOAD_IMAGE_COLOR);
 
         // Show visualization of original image, overlaying annotations joined appropriately by lines
-        if (visualise)
+        if (heatmap_data_param.visualize())
         {
         	// Clone the original image
             cv::Mat img_annotation_vis = img.clone();
             // Overlay keypoint annotation(s) on the cloned image
-            this->VisualiseAnnotations(img_annotation_vis, cur_label.size(), cur_label);
+            this->VisualizeAnnotations(img_annotation_vis, cur_label.size()/2, cur_label);
             // Display the image with the keypoints overlaid
             cv::imshow("input image", img_annotation_vis);
         }
-
-        // Width and height of the image
-        int width = img.cols;
-        int height = img.rows;
-        // Subtract crop size from width and height (to get a list of indices from where
-        // we can choose any pair at random, without having to worry if it will lie entirely
-        // inside the iamge)
-        int x_border = width;
-        int y_border = height;
 
         // Convert from BGR (OpenCV) to RGB (Caffe)
         cv::cvtColor(img, img, CV_BGR2RGB);
@@ -343,7 +296,7 @@ void HeatmapDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
 
         //     DLOG(INFO) << "Subtracted mean image.";
 
-        //     if (visualise){
+        //     if (heatmap_data_param.visualize()){
         //     	img_vis = img.clone();
         //         img_vis -= mean_img_this;
         //         img_mean_vis = mean_img_this.clone() / 255;
@@ -379,9 +332,9 @@ void HeatmapDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
         const int label_img_size = label_channel_size * label_num_channels;
 
         // Create a data matrix (cv Mat) to store the label image
-        cv::Mat dataMatrix = cv::Mat::zeros(heatmap_data_param.label_height(), heatmap_data_param.label_width(), cv_32FC1);
+        cv::Mat dataMatrix = cv::Mat::zeros(heatmap_data_param.label_height(), heatmap_data_param.label_width(), CV_32FC1);
         // Resize factor for the label
-        float label_resize_fact = (float) heatmap_data_param.label_height() / (float) heatmap_data_param.data_output_size;
+        float label_resize_fact = (float) heatmap_data_param.label_height() / (float) heatmap_data_param.data_output_size();
 
         // Write the label data to the image (after applying gaussian smoothing to the ground-truth 
         // keypoint location)
@@ -418,7 +371,7 @@ void HeatmapDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
         this->AdvanceCurImg();
 
         // Loop forever, if visualizing
-        if (visualise){
+        if (heatmap_data_param.visualize()){
             cv::waitKey(0);
         }
 
@@ -458,19 +411,18 @@ void HeatmapDataLayer<Dtype>::AdvanceCurImg()
 
 // Visualize annotations
 template<typename T>
-void HeatmapDataLayer<T>::VisualiseAnnotations(cv::Mat img_annotation_vis, int label_num_channels, std::vector<float>& img_class, int multfact)
+void HeatmapDataLayer<T>::VisualizeAnnotations(cv::Mat img_annotation_vis, int label_num_channels, std::vector<float>& img_class)
 {
     // Color for the keypoint
     const static cv::Scalar colors[] = {CV_RGB(0, 0, 255)};
 
     // Number of keypoint coordinates
-    int numCoordinates = int(label_num_channels / 2);
 
     // Draw keypoint on the image
-    cv::Point centers[numCoordinates];
+    cv::Point centers[(int) label_num_channels];
     for(int i = 0; i < label_num_channels; i += 2){
         int coordInd = int(i/2);
-        centers[coordInd] = cv::Point(img_class[i] * multfact, img_class[i+1] * multfact);
+        centers[coordInd] = cv::Point(img_class[i], img_class[i+1]);
         cv::circle(img_annotation_vis, centers[coordInd], 1, colors[coordInd], 3);
     }
 
@@ -483,22 +435,6 @@ float HeatmapDataLayer<Dtype>::Uniform(const float min, const float max) {
     float diff = max - min;
     float r = random * diff;
     return min + r;
-}
-
-template <typename Dtype>
-cv::Mat HeatmapDataLayer<Dtype>::RotateImage(cv::Mat src, float rotation_angle)
-{
-    cv::Mat rot_mat(2, 3, CV_32FC1);
-    cv::Point center = cv::Point(src.cols / 2, src.rows / 2);
-    double scale = 1;
-
-    // Get the rotation matrix with the specifications above
-    rot_mat = cv::getRotationMatrix2D(center, rotation_angle, scale);
-
-    // Rotate the warped image
-    cv::warpAffine(src, src, rot_mat, src.size());
-
-    return rot_mat;
 }
 
 INSTANTIATE_CLASS(HeatmapDataLayer);

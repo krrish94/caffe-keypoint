@@ -56,13 +56,13 @@ protected:
     virtual void load_batch(Batch<Dtype>* batch);
 
     // Filename of current image
-    inline void GetCurImg(string& img_name, std::vector<float>& img_class, std::vector<float>& crop_info, int& cur_class);
+    inline void GetCurImg(string& img_name, std::vector<float>& img_label);
 
     // Advance to the next image
     inline void AdvanceCurImg();
 
     // Visualise keypoint annotations
-    inline void VisualiseAnnotations(cv::Mat img_annotation_vis, int numChannels, std::vector<float>& cur_label, int width);
+    inline void VisualizeAnnotations(cv::Mat img_annotation_vis, int numChannels, std::vector<float>& cur_label);
 
     // Random number generator
     inline float Uniform(const float min, const float max);
@@ -103,7 +103,7 @@ protected:
     vector< vector< pair<string, pair<vector<float>, pair<vector<float>, int> > > > > img_list_;
 
     // Vector of (image, label) pairs
-    vector< pair<string, <vector<float> > > > img_label_list_;
+    vector< pair<string, vector<float> > > img_label_list_;
 };
 
 }
