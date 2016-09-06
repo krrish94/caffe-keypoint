@@ -769,13 +769,15 @@ message HeatmapDataParameter {
   optional string root_img_dir = 1002;
   // Input file containing training metadata and labels
   optional string source = 1003;
-  // Mean file (binaryproto)
-  optional string mean_file = 1004;
   // Size of the output image of the HeatmapDataLayer (assumed to be square)
-  optional uint32 data_output_size = 1005;
+  optional uint32 data_output_size = 1004;
   // Length and height of the label (ground-truth keypoint location)
-  optional uint32 label_width = 1006 [ default = 1 ];
-  optional uint32 label_height = 1007 [ default = 1 ];
+  optional uint32 label_width = 1005 [ default = 1 ];
+  optional uint32 label_height = 1006 [ default = 1 ];
+  // Whether or not to visualize blobs and intermediate images (used for debugging)
+  optional bool visualize = 1007 [ default = false ];
+  // 'Spread' of the Gaussian around the ground-truth keypoint
+  optional float label_sigma = 1008 [ default = 1.5 ];
 }
 
 message HingeLossParameter {
