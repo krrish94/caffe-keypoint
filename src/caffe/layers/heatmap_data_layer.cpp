@@ -83,6 +83,7 @@ void HeatmapDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
 
     	// Push relevant data to the (img, label) list
 		img_label_list_.push_back(std::make_pair(img_name, label));
+        // LOG(INFO) << img_name;
 
     }
 
